@@ -1,42 +1,38 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import Link from "next/link"
-import { Shield } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { Shield, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { resetPassword } from "@/lib/auth/actions";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("")
-  const [isSubmitted, setIsSubmitted] = useState(false)
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [isPending, startTransition] = useTransition();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
+    e.preventDefault();
+    setError("");
 
-    try {
-      if (!email) {
-        setError("Please enter your email address")
-        setIsLoading(false)
-        return
-      }
-
-      // Mock password reset request - replace with actual Supabase
-      setTimeout(() => {
-        setIsSubmitted(true)
-        setIsLoading(false)
-      }, 500)
-    } catch (err) {
-      setError("Failed to send reset link. Please try again.")
-      setIsLoading(false)
+    if (!email) {
+      setError("Please enter your email address");
+      return;
     }
-  }
+
+    startTransition(async () => {
+      const result = await resetPassword(email);
+
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.success) {
+        setIsSubmitted(true);
+      }
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -45,15 +41,19 @@ export default function ForgotPasswordPage() {
           <Shield className="h-6 w-6 text-white" />
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Reset Password</h1>
-        <p className="text-center text-gray-600">Enter your email to receive a password reset link</p>
+        <p className="text-center text-gray-600">
+          Enter your email to receive a password reset link
+        </p>
       </div>
 
       <div className="rounded-lg bg-white p-8 shadow-md">
         {isSubmitted ? (
           <div className="space-y-4">
             <Alert className="border-green-200 bg-green-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-700">
-                Password reset link sent! Check your email for further instructions.
+                Password reset link sent! Check your email for further
+                instructions.
               </AlertDescription>
             </Alert>
             <Link href="/login">
@@ -64,13 +64,18 @@ export default function ForgotPasswordPage() {
           <>
             {error && (
               <Alert className="mb-6 border-red-200 bg-red-50">
-                <AlertDescription className="text-red-700">{error}</AlertDescription>
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-700">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Email Address</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Email Address
+                </label>
                 <Input
                   type="email"
                   placeholder="your@email.com"
@@ -80,8 +85,8 @@ export default function ForgotPasswordPage() {
                 />
               </div>
 
-              <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? "Sending..." : "Send Reset Link"}
+              <Button type="submit" disabled={isPending} className="w-full">
+                {isPending ? "Sending..." : "Send Reset Link"}
               </Button>
             </form>
 
@@ -94,5 +99,5 @@ export default function ForgotPasswordPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
