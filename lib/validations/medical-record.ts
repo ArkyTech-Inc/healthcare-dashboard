@@ -1,0 +1,41 @@
+import { z } from 'zod';
+
+export const medicalRecordSchema = z.object({
+  patient_id: z.string().min(1, 'Patient is required'),
+  provider_id: z.string().min(1, 'Provider is required'),
+  record_type: z.enum([
+    'consultation',
+    'diagnosis',
+    'prescription',
+    'lab_result',
+    'imaging',
+    'procedure',
+    'vaccination',
+    'admission',
+    'discharge',
+    'referral',
+  ]),
+  record_date: z.string().min(1, 'Record date is required'),
+  record_time: z.string().optional(),
+  status: z.enum(['draft', 'pending', 'completed', 'cancelled', 'amended']).default('completed'),
+  chief_complaint: z.string().optional(),
+  present_illness: z.string().optional(),
+  physical_examination: z.string().optional(),
+  diagnosis: z.string().min(1, 'Diagnosis is required'),
+  diagnosis_codes: z.string().optional(),
+  treatment_plan: z.string().optional(),
+  vital_signs_bp: z.string().optional(),
+  vital_signs_hr: z.string().optional(),
+  vital_signs_temp: z.string().optional(),
+  vital_signs_rr: z.string().optional(),
+  vital_signs_spo2: z.string().optional(),
+  vital_signs_weight: z.string().optional(),
+  vital_signs_height: z.string().optional(),
+  follow_up_required: z.boolean().default(false),
+  follow_up_date: z.string().optional(),
+  follow_up_notes: z.string().optional(),
+  is_confidential: z.boolean().default(false),
+  notes: z.string().optional(),
+});
+
+export type MedicalRecordFormSchema = z.infer<typeof medicalRecordSchema>;

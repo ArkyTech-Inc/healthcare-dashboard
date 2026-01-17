@@ -1,4 +1,4 @@
-import MedicalRecordForm from "@/components/medical-records/medical-record-form"
+import { MedicalRecordForm } from "@/components/medical-records/medical-record-form"
 
 export default function NewMedicalRecordPage() {
   return (
