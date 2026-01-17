@@ -190,7 +190,7 @@ export function MedicalRecordForm({
               <SelectContent>
                 {providers.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
-                    {provider.user_id}
+                    {provider.full_name} - {provider.specialty}
                   </SelectItem>
                 ))}
               </SelectContent>
