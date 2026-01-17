@@ -1,338 +1,372 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import type { Patient } from "@/types/patient";
 
 interface PatientFormProps {
-  mode: "create" | "edit"
-  patient?: any
+  patient?: Patient;
+  mode?: "create" | "edit";
 }
 
-export default function PatientForm({ mode, patient }: PatientFormProps) {
-  const router = useRouter()
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+export function PatientForm({ patient, mode = "create" }: PatientFormProps) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
   const [formData, setFormData] = useState({
     first_name: patient?.first_name || "",
     last_name: patient?.last_name || "",
     date_of_birth: patient?.date_of_birth || "",
-    gender: patient?.gender || "prefer_not_to_say",
+    gender: patient?.gender || "male",
     blood_type: patient?.blood_type || "unknown",
     phone: patient?.phone || "",
     email: patient?.email || "",
-    address_line1: patient?.address?.line1 || "",
-    address_line2: patient?.address?.line2 || "",
+    address_line1: patient?.address_line1 || "",
     city: patient?.city || "",
     state: patient?.state || "",
     postal_code: patient?.postal_code || "",
-    country: patient?.country || "USA",
-    emergency_contact_name: patient?.emergency_contact?.name || "",
-    emergency_contact_relationship: patient?.emergency_contact?.relationship || "",
-    emergency_contact_phone: patient?.emergency_contact?.phone || "",
+    emergency_contact_name: patient?.emergency_contact_name || "",
+    emergency_contact_phone: patient?.emergency_contact_phone || "",
     allergies: patient?.allergies?.join(", ") || "",
     current_medications: patient?.current_medications?.join(", ") || "",
     chronic_conditions: patient?.chronic_conditions?.join(", ") || "",
-    insurance_provider: patient?.insurance?.provider || "",
-    insurance_policy_number: patient?.insurance?.policy_number || "",
-    height_cm: patient?.height_cm || "",
-    weight_kg: patient?.weight_kg || "",
-    notes: patient?.notes || "",
-  })
+    insurance_provider: patient?.insurance_provider || "",
+    insurance_policy_number: patient?.insurance_policy_number || "",
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  }
 
-    try {
-      if (!formData.first_name || !formData.last_name || !formData.phone) {
-        setError("Please fill in all required fields")
-        setIsLoading(false)
-        return
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const url =
+          mode === "create" ? "/api/patients" : `/api/patients/${patient?.id}`;
+        const method = mode === "create" ? "POST" : "PUT";
+
+        const response = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          router.push("/patients");
+          router.refresh();
+        } else {
+          setError(result.error || "An error occurred");
+        }
+      } catch (err: any) {
+        setError(err.message);
       }
-
-      // Simulate API call
-      setTimeout(() => {
-        router.push("/patients")
-        router.refresh()
-      }, 500)
-    } catch (err) {
-      setError("Failed to save patient. Please try again.")
-      setIsLoading(false)
-    }
+    });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
-        <Alert className="border-red-200 bg-red-50">
-          <AlertDescription className="text-red-700">{error}</AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Personal Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Personal Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="First Name"
-            required
-            value={formData.first_name}
-            onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-          />
-          <FormField
-            label="Last Name"
-            required
-            value={formData.last_name}
-            onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-          />
-          <FormField
-            label="Date of Birth"
-            type="date"
-            value={formData.date_of_birth}
-            onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-          />
-          <SelectField
-            label="Gender"
-            value={formData.gender}
-            onChange={(value) => setFormData({ ...formData, gender: value })}
-            options={[
-              { value: "male", label: "Male" },
-              { value: "female", label: "Female" },
-              { value: "other", label: "Other" },
-              { value: "prefer_not_to_say", label: "Prefer not to say" },
-            ]}
-          />
-          <SelectField
-            label="Blood Type"
-            value={formData.blood_type}
-            onChange={(value) => setFormData({ ...formData, blood_type: value })}
-            options={[
-              { value: "O+", label: "O+" },
-              { value: "O-", label: "O-" },
-              { value: "A+", label: "A+" },
-              { value: "A-", label: "A-" },
-              { value: "B+", label: "B+" },
-              { value: "B-", label: "B-" },
-              { value: "AB+", label: "AB+" },
-              { value: "AB-", label: "AB-" },
-              { value: "unknown", label: "Unknown" },
-            ]}
-          />
-          <FormField
-            label="Height (cm)"
-            type="number"
-            value={formData.height_cm}
-            onChange={(e) => setFormData({ ...formData, height_cm: e.target.value })}
-          />
-          <FormField
-            label="Weight (kg)"
-            type="number"
-            value={formData.weight_kg}
-            onChange={(e) => setFormData({ ...formData, weight_kg: e.target.value })}
-          />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Personal Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="first_name">First Name *</Label>
+            <Input
+              id="first_name"
+              name="first_name"
+              value={formData.first_name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="last_name">Last Name *</Label>
+            <Input
+              id="last_name"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="date_of_birth">Date of Birth *</Label>
+            <Input
+              id="date_of_birth"
+              name="date_of_birth"
+              type="date"
+              value={formData.date_of_birth}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="gender">Gender *</Label>
+            <Select
+              name="gender"
+              value={formData.gender}
+              onValueChange={(value) =>
+                setFormData({ ...formData, gender: value as any })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="prefer_not_to_say">
+                  Prefer not to say
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="blood_type">Blood Type *</Label>
+            <Select
+              name="blood_type"
+              value={formData.blood_type}
+              onValueChange={(value) =>
+                setFormData({ ...formData, blood_type: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="A+">A+</SelectItem>
+                <SelectItem value="A-">A-</SelectItem>
+                <SelectItem value="B+">B+</SelectItem>
+                <SelectItem value="B-">B-</SelectItem>
+                <SelectItem value="AB+">AB+</SelectItem>
+                <SelectItem value="AB-">AB-</SelectItem>
+                <SelectItem value="O+">O+</SelectItem>
+                <SelectItem value="O-">O-</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       {/* Contact Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Contact Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="Phone"
-            required
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-          />
-          <FormField
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
-          <FormField
-            label="Address Line 1"
-            value={formData.address_line1}
-            onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
-          />
-          <FormField
-            label="Address Line 2"
-            value={formData.address_line2}
-            onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-          />
-          <FormField
-            label="City"
-            value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-          />
-          <FormField
-            label="State"
-            value={formData.state}
-            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-          />
-          <FormField
-            label="Postal Code"
-            value={formData.postal_code}
-            onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-          />
-          <FormField
-            label="Country"
-            value={formData.country}
-            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-          />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Contact Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="phone">Phone *</Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="address_line1">Address</Label>
+            <Input
+              id="address_line1"
+              name="address_line1"
+              value={formData.address_line1}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="state">State</Label>
+            <Input
+              id="state"
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="postal_code">Postal Code</Label>
+            <Input
+              id="postal_code"
+              name="postal_code"
+              value={formData.postal_code}
+              onChange={handleChange}
+            />
+          </div>
         </div>
       </div>
 
       {/* Emergency Contact */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Emergency Contact</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="Name"
-            required
-            value={formData.emergency_contact_name}
-            onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
-          />
-          <FormField
-            label="Relationship"
-            value={formData.emergency_contact_relationship}
-            onChange={(e) => setFormData({ ...formData, emergency_contact_relationship: e.target.value })}
-          />
-          <FormField
-            label="Phone"
-            required
-            type="tel"
-            value={formData.emergency_contact_phone}
-            onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
-          />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Emergency Contact</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="emergency_contact_name">Contact Name *</Label>
+            <Input
+              id="emergency_contact_name"
+              name="emergency_contact_name"
+              value={formData.emergency_contact_name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="emergency_contact_phone">Contact Phone *</Label>
+            <Input
+              id="emergency_contact_phone"
+              name="emergency_contact_phone"
+              type="tel"
+              value={formData.emergency_contact_phone}
+              onChange={handleChange}
+              required
+            />
+          </div>
         </div>
       </div>
 
       {/* Medical Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Medical Information</h2>
-        <div className="grid grid-cols-1 gap-6">
-          <FormField
-            label="Allergies"
-            placeholder="Penicillin, Latex, etc. (comma-separated)"
-            value={formData.allergies}
-            onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
-          />
-          <FormField
-            label="Current Medications"
-            placeholder="Lisinopril, Metformin, etc. (comma-separated)"
-            value={formData.current_medications}
-            onChange={(e) => setFormData({ ...formData, current_medications: e.target.value })}
-          />
-          <FormField
-            label="Chronic Conditions"
-            placeholder="Type 2 Diabetes, Hypertension, etc. (comma-separated)"
-            value={formData.chronic_conditions}
-            onChange={(e) => setFormData({ ...formData, chronic_conditions: e.target.value })}
-          />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Medical Information</h2>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="allergies">Allergies</Label>
+            <Input
+              id="allergies"
+              name="allergies"
+              value={formData.allergies}
+              onChange={handleChange}
+              placeholder="Separate with commas"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="current_medications">Current Medications</Label>
+            <Input
+              id="current_medications"
+              name="current_medications"
+              value={formData.current_medications}
+              onChange={handleChange}
+              placeholder="Separate with commas"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="chronic_conditions">Chronic Conditions</Label>
+            <Input
+              id="chronic_conditions"
+              name="chronic_conditions"
+              value={formData.chronic_conditions}
+              onChange={handleChange}
+              placeholder="Separate with commas"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Insurance Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Insurance Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="Provider"
-            value={formData.insurance_provider}
-            onChange={(e) => setFormData({ ...formData, insurance_provider: e.target.value })}
-          />
-          <FormField
-            label="Policy Number"
-            value={formData.insurance_policy_number}
-            onChange={(e) => setFormData({ ...formData, insurance_policy_number: e.target.value })}
-          />
-        </div>
-      </div>
+      {/* Insurance */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Insurance Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="insurance_provider">Insurance Provider</Label>
+            <Input
+              id="insurance_provider"
+              name="insurance_provider"
+              value={formData.insurance_provider}
+              onChange={handleChange}
+            />
+          </div>
 
-      {/* Notes */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Additional Notes</h2>
-        <Textarea
-          placeholder="Any additional notes about the patient..."
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          className="min-h-24"
-        />
+          <div>
+            <Label htmlFor="insurance_policy_number">Policy Number</Label>
+            <Input
+              id="insurance_policy_number"
+              name="insurance_policy_number"
+              value={formData.insurance_policy_number}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
+      <div className="flex justify-end gap-4 pt-6 border-t">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+        >
           Cancel
         </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Saving..." : mode === "create" ? "Create Patient" : "Update Patient"}
+        <Button type="submit" disabled={isPending}>
+          {isPending
+            ? mode === "create"
+              ? "Creating..."
+              : "Updating..."
+            : mode === "create"
+            ? "Create Patient"
+            : "Update Patient"}
         </Button>
       </div>
     </form>
-  )
-}
-
-function FormField({
-  label,
-  required,
-  type = "text",
-  placeholder,
-  value,
-  onChange,
-}: {
-  label: string
-  required?: boolean
-  type?: string
-  placeholder?: string
-  value: any
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-        {required && <span className="text-red-600 ml-1">*</span>}
-      </label>
-      <Input type={type} placeholder={placeholder} value={value} onChange={onChange} />
-    </div>
-  )
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
+  );
 }
