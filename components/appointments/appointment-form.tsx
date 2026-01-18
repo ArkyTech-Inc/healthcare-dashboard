@@ -1,170 +1,316 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import type { Appointment } from "@/types/appointment";
 
-const mockPatients = [
-  { id: "1", name: "Sarah Johnson" },
-  { id: "2", name: "Michael Chen" },
-  { id: "3", name: "Emma Davis" },
-]
+interface AppointmentFormProps {
+  appointment?: Appointment;
+  mode?: "create" | "edit";
+  patientId?: string;
+}
 
-const mockProviders = [
-  { id: "1", name: "Dr. Smith" },
-  { id: "2", name: "Dr. Johnson" },
-  { id: "3", name: "Dr. Williams" },
-]
+export function AppointmentForm({
+  appointment,
+  mode = "create",
+  patientId,
+}: AppointmentFormProps) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [patients, setPatients] = useState<any[]>([]);
+  const [providers, setProviders] = useState<any[]>([]);
 
-export default function AppointmentForm() {
-  const router = useRouter()
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
-    patient_id: "",
-    provider_id: "",
-    appointment_date: "",
-    appointment_time: "",
-    reason: "",
-    status: "scheduled",
-  })
+    patient_id: patientId || appointment?.patient_id || "",
+    provider_id: appointment?.provider_id || "",
+    appointment_date:
+      appointment?.appointment_date || new Date().toISOString().split("T")[0],
+    appointment_time: appointment?.appointment_time || "09:00",
+    duration_minutes: appointment?.duration_minutes?.toString() || "30",
+    appointment_type: appointment?.appointment_type || "consultation",
+    status: appointment?.status || "scheduled",
+    reason: appointment?.reason || "",
+    notes: appointment?.notes || "",
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
+  useEffect(() => {
+    fetchPatients();
+    fetchProviders();
+  }, []);
 
+  async function fetchPatients() {
     try {
-      if (!formData.patient_id || !formData.provider_id || !formData.appointment_date || !formData.appointment_time) {
-        setError("Please fill in all required fields")
-        setIsLoading(false)
-        return
+      const response = await fetch("/api/patients?limit=100");
+      const result = await response.json();
+      if (response.ok) {
+        setPatients(result.data || []);
       }
-
-      setTimeout(() => {
-        router.push("/appointments")
-        router.refresh()
-      }, 500)
-    } catch (err) {
-      setError("Failed to create appointment")
-      setIsLoading(false)
+    } catch (error) {
+      console.error("Failed to fetch patients:", error);
     }
   }
 
+  async function fetchProviders() {
+    try {
+      const response = await fetch("/api/providers?limit=100");
+      const result = await response.json();
+      if (response.ok) {
+        setProviders(result.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch providers:", error);
+    }
+  }
+
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.patient_id || !formData.provider_id) {
+      setError("Patient and Provider are required");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const url =
+          mode === "create"
+            ? "/api/appointments"
+            : `/api/appointments/${appointment?.id}`;
+        const method = mode === "create" ? "POST" : "PUT";
+
+        const response = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          router.push("/appointments");
+          router.refresh();
+        } else {
+          setError(result.error || "An error occurred");
+        }
+      } catch (err: any) {
+        setError(err.message);
+      }
+    });
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <Alert className="border-red-200 bg-red-50">
-          <AlertDescription className="text-red-700">{error}</AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Appointment Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="patient_id">Patient *</Label>
+          <Select
+            name="patient_id"
+            value={formData.patient_id}
+            onValueChange={(value) =>
+              setFormData({ ...formData, patient_id: value })
+            }
+            disabled={!!patientId}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select patient" />
+            </SelectTrigger>
+            <SelectContent>
+              {patients.map((patient) => (
+                <SelectItem key={patient.id} value={patient.id}>
+                  {patient.first_name} {patient.last_name} ({patient.mrn})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="provider_id">Provider *</Label>
+          <Select
+            name="provider_id"
+            value={formData.provider_id}
+            onValueChange={(value) =>
+              setFormData({ ...formData, provider_id: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select provider" />
+            </SelectTrigger>
+            <SelectContent>
+              {providers.map((provider) => (
+                <SelectItem key={provider.id} value={provider.id}>
+                  {provider.full_name} - {provider.specialty}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="appointment_date">Date *</Label>
+          <Input
+            id="appointment_date"
+            name="appointment_date"
+            type="date"
+            value={formData.appointment_date}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="appointment_time">Time *</Label>
+          <Input
+            id="appointment_time"
+            name="appointment_time"
+            type="time"
+            value={formData.appointment_time}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="duration_minutes">Duration (minutes)</Label>
+          <Select
+            name="duration_minutes"
+            value={formData.duration_minutes}
+            onValueChange={(value) =>
+              setFormData({ ...formData, duration_minutes: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15 minutes</SelectItem>
+              <SelectItem value="30">30 minutes</SelectItem>
+              <SelectItem value="45">45 minutes</SelectItem>
+              <SelectItem value="60">1 hour</SelectItem>
+              <SelectItem value="90">1.5 hours</SelectItem>
+              <SelectItem value="120">2 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="appointment_type">Type *</Label>
+          <Select
+            name="appointment_type"
+            value={formData.appointment_type}
+            onValueChange={(value) =>
+              setFormData({ ...formData, appointment_type: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="consultation">Consultation</SelectItem>
+              <SelectItem value="follow-up">Follow-up</SelectItem>
+              <SelectItem value="procedure">Procedure</SelectItem>
+              <SelectItem value="lab-work">Lab Work</SelectItem>
+              <SelectItem value="imaging">Imaging</SelectItem>
+              <SelectItem value="vaccination">Vaccination</SelectItem>
+              <SelectItem value="physical">Physical Exam</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {mode === "edit" && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Patient <span className="text-red-600">*</span>
-            </label>
+            <Label htmlFor="status">Status</Label>
             <Select
-              value={formData.patient_id}
-              onValueChange={(value) => setFormData({ ...formData, patient_id: value })}
+              name="status"
+              value={formData.status}
+              onValueChange={(value) =>
+                setFormData({ ...formData, status: value as any })
+              }
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a patient" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockPatients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Provider <span className="text-red-600">*</span>
-            </label>
-            <Select
-              value={formData.provider_id}
-              onValueChange={(value) => setFormData({ ...formData, provider_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockProviders.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date <span className="text-red-600">*</span>
-            </label>
-            <Input
-              type="date"
-              value={formData.appointment_date}
-              onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Time <span className="text-red-600">*</span>
-            </label>
-            <Input
-              type="time"
-              value={formData.appointment_time}
-              onChange={(e) => setFormData({ ...formData, appointment_time: e.target.value })}
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Visit</label>
-            <Textarea
-              placeholder="Enter reason for appointment..."
-              value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="min-h-24"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="no-show">No Show</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
+      <div>
+        <Label htmlFor="reason">Reason for Visit</Label>
+        <Textarea
+          id="reason"
+          name="reason"
+          value={formData.reason}
+          onChange={handleChange}
+          rows={2}
+          placeholder="E.g., Annual checkup, follow-up from previous visit..."
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="notes">Notes</Label>
+        <Textarea
+          id="notes"
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          rows={3}
+          placeholder="Any additional notes..."
+        />
+      </div>
+
+      <div className="flex justify-end gap-4 pt-4 border-t">
+        <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Creating..." : "Create Appointment"}
+        <Button type="submit" disabled={isPending}>
+          {isPending
+            ? mode === "create"
+              ? "Scheduling..."
+              : "Updating..."
+            : mode === "create"
+            ? "Schedule Appointment"
+            : "Update Appointment"}
         </Button>
       </div>
     </form>
-  )
+  );
 }

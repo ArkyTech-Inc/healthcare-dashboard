@@ -1,4 +1,4 @@
-import AppointmentForm from "@/components/appointments/appointment-form"
+import {AppointmentForm} from "@/components/appointments/appointment-form"
 
 export default function NewAppointmentPage() {
   return (
