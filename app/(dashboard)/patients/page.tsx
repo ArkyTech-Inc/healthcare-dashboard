@@ -20,7 +20,7 @@ export default function PatientsPage() {
         </div>
       </div>
       {/* Table */}
-      <PatientsTable searchQuery={searchQuery} />
+      <PatientsTable />
     </div>
   )
 }
